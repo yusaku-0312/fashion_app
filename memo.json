@@ -1,0 +1,268 @@
+{
+    "index2second": [
+        {
+            "headers": {
+                "host": "shiba-yusaku-1030.app.n8n.cloud",
+                "user-agent": "python-requests/2.31.0",
+                "content-length": "1279",
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "cdn-loop": "cloudflare; loops=1; subreqs=1",
+                "cf-connecting-ip": "133.5.123.96",
+                "cf-ew-via": "15",
+                "cf-ipcountry": "JP",
+                "cf-ray": "9973159f23becffe-KIX",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "cf-worker": "n8n.cloud",
+                "content-type": "application/json",
+                "x-forwarded-for": "133.5.123.96, 172.69.63.179",
+                "x-forwarded-host": "shiba-yusaku-1030.app.n8n.cloud",
+                "x-forwarded-port": "443",
+                "x-forwarded-proto": "https",
+                "x-forwarded-server": "traefik-prod-users-gwc-80-5fc4f59987-jxvcn",
+                "x-is-trusted": "yes",
+                "x-real-ip": "133.5.123.96"
+            },
+            "params": {},
+            "query": {},
+            "body": {
+                "account_name": "test001",
+                "timestamp": "2025-10-31T21:16:36.885488",
+                "like_criteria": "・快適さや着心地の良さを重視している  \n・トレンドや流行を意識して選んでいる  \n・カジュアルでリラックスできるスタイルを好む  \n・単色やシンプルなデザインを好む  \n・使いやすさや汎用性を考えている  \n・素材感や質にもこだわりがある  \n・若々しい印象や個性を出したいと思っている  \n・季節や気候に適した素材や厚さを選んでいる  \n・見た目の清潔感や整った印象を気にしている  \n・アクセサリーや小物と合わせやすさを考慮している"
+            },
+            "webhookUrl": "https://shiba-yusaku-1030.app.n8n.cloud/webhook-test/like",
+            "executionMode": "test"
+        }
+    ],
+    "second2output": [
+        {
+            "headers": {
+                "host": "shiba-yusaku-1030.app.n8n.cloud",
+                "user-agent": "python-requests/2.31.0",
+                "content-length": "1318",
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "cdn-loop": "cloudflare; loops=1; subreqs=1",
+                "cf-connecting-ip": "133.5.123.96",
+                "cf-ew-via": "15",
+                "cf-ipcountry": "JP",
+                "cf-ray": "997317bf6168d3e3-KIX",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "cf-worker": "n8n.cloud",
+                "content-type": "application/json",
+                "x-forwarded-for": "133.5.123.96, 172.69.169.221",
+                "x-forwarded-host": "shiba-yusaku-1030.app.n8n.cloud",
+                "x-forwarded-port": "443",
+                "x-forwarded-proto": "https",
+                "x-forwarded-server": "traefik-prod-users-gwc-80-5fc4f59987-jxvcn",
+                "x-is-trusted": "yes",
+                "x-real-ip": "133.5.123.96"
+            },
+            "params": {},
+            "query": {},
+            "body": {
+                "account_name": "test001",
+                "timestamp": "2025-10-31T21:18:03.975633",
+                "dislike_criteria": "・派手すぎるデザインやプリントが嫌い\n・色使いが奇抜または不調和に感じる\n・個性的すぎるパターンや迷彩柄が苦手\n・キャラクターやロゴが目立ちすぎて好みでない\n・アニメやスポーツチームのロゴが好きじゃない\n・全体的なカジュアル過ぎる印象やだらしなさを感じる\n・色彩のコントラストが強すぎて落ち着かない\n・素材や質感が好みの範囲外\n・デザインが古臭く感じるまたはトレンドに合わない\n・洗練されていない安っぽさや粗野なデザイン"
+            },
+            "webhookUrl": "https://shiba-yusaku-1030.app.n8n.cloud/webhook-test/dislike",
+            "executionMode": "test"
+        }
+    ],
+    "result": [
+        {
+            "headers": {
+                "host": "shiba-yusaku-1030.app.n8n.cloud",
+                "user-agent": "python-requests/2.31.0",
+                "content-length": "12469",
+                "accept": "*/*",
+                "accept-encoding": "gzip, br",
+                "cdn-loop": "cloudflare; loops=1; subreqs=1",
+                "cf-connecting-ip": "133.5.123.96",
+                "cf-ew-via": "15",
+                "cf-ipcountry": "JP",
+                "cf-ray": "997332ccb42dd3f1-KIX",
+                "cf-visitor": "{\"scheme\":\"https\"}",
+                "cf-worker": "n8n.cloud",
+                "content-type": "application/json",
+                "x-forwarded-for": "133.5.123.96, 172.69.169.221",
+                "x-forwarded-host": "shiba-yusaku-1030.app.n8n.cloud",
+                "x-forwarded-port": "443",
+                "x-forwarded-proto": "https",
+                "x-forwarded-server": "traefik-prod-users-gwc-80-5fc4f59987-9545r",
+                "x-is-trusted": "yes",
+                "x-real-ip": "133.5.123.96"
+            },
+            "params": {},
+            "query": {},
+            "body": {
+                "account_name": "test001",
+                "timestamp": "2025-10-31T21:36:32.032808",
+                "results": [
+                    {
+                        "image_id": "test1",
+                        "prediction_propose": "派手すぎず落ち着いた柄で、シンプルで使いやすそうだと感じる。",
+                        "prediction_compare": "リラックスできて着やすそうだけど、デザインや素材よりも快適さとシンプルさを重視している私には、ちょっとデザインが派手に感じるかもしれない。",
+                        "score_propose": 1,
+                        "score_compare": 4,
+                        "display_order": "compare_left"
+                    },
+                    {
+                        "image_id": "test2",
+                        "prediction_propose": "落ち着いた色合いでシンプルなデザインなので、普段の生活に自然に馴染みそうだと感じる。",
+                        "prediction_compare": "この服はシンプルで着やすそうだから、日常的に気軽に着こなせそうだと感じる。",
+                        "score_propose": 2,
+                        "score_compare": 2,
+                        "display_order": "compare_left"
+                    },
+                    {
+                        "image_id": "test3",
+                        "prediction_propose": "シンプルで落ち着いたデザインだけど、少し地味だと感じるかもしれない。",
+                        "prediction_compare": "シンプルで着やすく、リラックスしたスタイルに合いそうだと感じます。",
+                        "score_propose": 4,
+                        "score_compare": 3,
+                        "display_order": "propose_left"
+                    },
+                    {
+                        "image_id": "test4",
+                        "prediction_propose": "クラシックでシンプルなデザインが落ち着いていて気に入ると思います。",
+                        "prediction_compare": "このコートはシンプルで使い勝手が良さそうだし、季節や気分に合わせて着こなせそうだと感じる。",
+                        "score_propose": 2,
+                        "score_compare": 2,
+                        "display_order": "compare_left"
+                    },
+                    {
+                        "image_id": "test5",
+                        "prediction_propose": "このデザインは派手で目立つので、あまり好きになれないかもしれないと感じる。",
+                        "prediction_compare": "カジュアルでリラックスしたスタイルを好む私には、シンプルで着やすそうなデザインに惹かれる一枚だと感じる。",
+                        "score_propose": 4,
+                        "score_compare": 2,
+                        "display_order": "compare_left"
+                    },
+                    {
+                        "image_id": "test6",
+                        "prediction_propose": "シンプルで着やすそうだけど、少し派手な色味が気になるかもしれない。",
+                        "prediction_compare": "着やすくてリラックスできるけど、シンプルでコーデもしやすそうだなと思います。",
+                        "score_propose": 4,
+                        "score_compare": 1,
+                        "display_order": "propose_left"
+                    },
+                    {
+                        "image_id": "test7",
+                        "prediction_propose": "シンプルで使いやすく、快適さを重視したデザインだから、長く飽きずに着られそうだと感じる。",
+                        "prediction_compare": "このシャツは快適さとシンプルさを重視した快適なデザインで、季節や気分に合わせて気軽に着られそうだと感じる。",
+                        "score_propose": 2,
+                        "score_compare": 3,
+                        "display_order": "propose_left"
+                    },
+                    {
+                        "image_id": "test8",
+                        "prediction_propose": "派手な刺繍やロゴが多くて、好みのシンプルさや落ち着きには合わないと感じそうです。",
+                        "prediction_compare": "このジャケットは個性やデザインを重視しつつも、着やすさと使い勝手の良さを感じられる一着だなと思います。",
+                        "score_propose": 4,
+                        "score_compare": 1,
+                        "display_order": "propose_left"
+                    },
+                    {
+                        "image_id": "test9",
+                        "prediction_propose": "シンプルで機能的なデザインだけど、少し派手なロゴが気になるかもしれません。",
+                        "prediction_compare": "このジャケットは普段使いに便利で着やすそうだなと感じる。",
+                        "score_propose": 4,
+                        "score_compare": 2,
+                        "display_order": "propose_left"
+                    },
+                    {
+                        "image_id": "test10",
+                        "prediction_propose": "シンプルでスポーティーなデザインだけど、少し目立ちやすいカラーが気になるかもしれません。",
+                        "prediction_compare": "シンプルでリラックスできるデザインだけど、少しスポーティすぎるかなと感じるかもしれません。",
+                        "score_propose": 5,
+                        "score_compare": 3,
+                        "display_order": "propose_left"
+                    },
+                    {
+                        "image_id": "test11",
+                        "prediction_propose": "この服はカラフルすぎて派手だけど、デザインはシンプルな部分もあって好みからは外れそうだ。",
+                        "prediction_compare": "この服はシンプルで着やすそうだけど、ちょっと派手すぎるかもしれないと感じる。",
+                        "score_propose": 1,
+                        "score_compare": 5,
+                        "display_order": "compare_left"
+                    },
+                    {
+                        "image_id": "test12",
+                        "prediction_propose": "この服はシンプルで快適さを重視している分、派手さや奇抜さはなく落ち着いた印象だと感じる。",
+                        "prediction_compare": "この服はシンプルで快適そうだから、気軽に着られてリラックスできそうだと思う。",
+                        "score_propose": 1,
+                        "score_compare": 5,
+                        "display_order": "propose_left"
+                    },
+                    {
+                        "image_id": "test13",
+                        "prediction_propose": "派手さや柄の多さが気になり、もう少しシンプルなデザインの方が好みだと感じそう。",
+                        "prediction_compare": "着やすさとシンプルさがあり、リラックスした気分で着られそうだと感じます。",
+                        "score_propose": 5,
+                        "score_compare": 2,
+                        "display_order": "compare_left"
+                    },
+                    {
+                        "image_id": "test14",
+                        "prediction_propose": "シンプルで使いやすそうだけど、少し地味すぎる気もする。",
+                        "prediction_compare": "この服はシンプルで着やすそうだから、きっと普段使いに適していて快適に着られると感じる。",
+                        "score_propose": 5,
+                        "score_compare": 1,
+                        "display_order": "compare_left"
+                    },
+                    {
+                        "image_id": "test15",
+                        "prediction_propose": "シンプルで普段使いに適した無地のブラックニットだと感じる。",
+                        "prediction_compare": "この服はシンプルで着やすそうだから、普段使いに便利だと感じる。",
+                        "score_propose": 3,
+                        "score_compare": 3,
+                        "display_order": "compare_left"
+                    },
+                    {
+                        "image_id": "test16",
+                        "prediction_propose": "鮮やかな柄と色使いだけど、派手すぎず個性的な印象を受ける。",
+                        "prediction_compare": "この服はデザインや素材よりも、着やすさや個性を重視しているように感じる。",
+                        "score_propose": 5,
+                        "score_compare": 2,
+                        "display_order": "propose_left"
+                    },
+                    {
+                        "image_id": "test17",
+                        "prediction_propose": "シンプルで使いやすく、リラックスしたカジュアルさが感じられる。",
+                        "prediction_compare": "この服はシンプルで着やすそうで、季節や気分に合わせて気軽に着こなせそうだと感じる。",
+                        "score_propose": 3,
+                        "score_compare": 5,
+                        "display_order": "compare_left"
+                    },
+                    {
+                        "image_id": "test18",
+                        "prediction_propose": "シンプルで着やすそうだけど、少し地味すぎる気がしてしまうかもしれない。",
+                        "prediction_compare": "このシャツはシンプルで便利そうだけど、ややきちんとした印象もあるから、気分や用途に合わせて選びやすいと感じる。",
+                        "score_propose": 2,
+                        "score_compare": 4,
+                        "display_order": "compare_left"
+                    },
+                    {
+                        "image_id": "test19",
+                        "prediction_propose": "シンプルで着やすそうだけど、ちょっと地味に感じるかもしれない。",
+                        "prediction_compare": "この服はシンプルで着やすそうなので、リラックスした普段使いに良さそうだと感じる。",
+                        "score_propose": 4,
+                        "score_compare": 1,
+                        "display_order": "propose_left"
+                    },
+                    {
+                        "image_id": "test20",
+                        "prediction_propose": "シンプルでシックなデザインだけど、少し地味に感じるかもしれない。",
+                        "prediction_compare": "このTシャツはシンプルで着やすそうだし、季節や気分に合わせて気楽に着られそうだなと思います。",
+                        "score_propose": 2,
+                        "score_compare": 2,
+                        "display_order": "compare_left"
+                    }
+                ]
+            },
+            "webhookUrl": "https://shiba-yusaku-1030.app.n8n.cloud/webhook-test/result",
+            "executionMode": "test"
+        }
+    ]
+}

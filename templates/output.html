@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI衣服評価実験 - 評価フォーム</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>AI衣服評価実験</h1>
+            <p class="subtitle">AIの予測に対して評価してください</p>
+        </header>
+
+        <main>
+            <section class="progress-section">
+                <div class="progress-bar">
+                    <div class="progress-step completed">
+                        <span class="step-number">1</span>
+                        <span class="step-label">好きな服</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="progress-step completed">
+                        <span class="step-number">2</span>
+                        <span class="step-label">嫌いな服</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="progress-step active">
+                        <span class="step-number">3</span>
+                        <span class="step-label">評価</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h2>ステップ 3: AIの予測を評価</h2>
+                <p class="instruction">各衣服画像に対する2つのAI予測を確認し、それぞれ5段階で評価してください。</p>
+
+                {% if error %}
+                <div class="error-message">
+                    <strong>エラー:</strong> {{ error }}
+                </div>
+                {% endif %}
+
+                <form method="POST" class="evaluation-form">
+                    <div class="evaluation-grid">
+                        {% for image in evaluation_images %}
+                        <div class="evaluation-card">
+                            <div class="card-header">
+                                <h3>{{ image.id }}</h3>
+                            </div>
+
+                            <div class="image-prediction-row">
+                                <!-- 画像列 -->
+                                <div class="image-column">
+                                    <img src="/test_data/{{ image.filename }}" alt="{{ image.id }}"
+                                        class="evaluation-image" onerror="this.style.display='none'">
+                                </div>
+
+                                <!-- 左側の予測 -->
+                                <div class="prediction-column">
+                                    <h4>予測A</h4>
+                                    <p class="prediction-text">{{ image.left_prediction }}</p>
+
+                                    <div class="rating-section">
+                                        <label>この予測への共感度 <span class="required">*</span></label>
+                                        <div class="rating-options">
+                                            <label class="radio-label">
+                                                <input type="radio" name="score_left_{{ image.id }}" value="1" required>
+                                                <span class="radio-text">1 - 全く共感できない</span>
+                                            </label>
+                                            <label class="radio-label">
+                                                <input type="radio" name="score_left_{{ image.id }}" value="2">
+                                                <span class="radio-text">2 - あまり共感できない</span>
+                                            </label>
+                                            <label class="radio-label">
+                                                <input type="radio" name="score_left_{{ image.id }}" value="3">
+                                                <span class="radio-text">3 - どちらでもない</span>
+                                            </label>
+                                            <label class="radio-label">
+                                                <input type="radio" name="score_left_{{ image.id }}" value="4">
+                                                <span class="radio-text">4 - ある程度共感できる</span>
+                                            </label>
+                                            <label class="radio-label">
+                                                <input type="radio" name="score_left_{{ image.id }}" value="5">
+                                                <span class="radio-text">5 - 非常に共感できる</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 右側の予測 -->
+                                <div class="prediction-column">
+                                    <h4>予測B</h4>
+                                    <p class="prediction-text">{{ image.right_prediction }}</p>
+
+                                    <div class="rating-section">
+                                        <label>この予測への共感度 <span class="required">*</span></label>
+                                        <div class="rating-options">
+                                            <label class="radio-label">
+                                                <input type="radio" name="score_right_{{ image.id }}" value="1"
+                                                    required>
+                                                <span class="radio-text">1 - 全く共感できない</span>
+                                            </label>
+                                            <label class="radio-label">
+                                                <input type="radio" name="score_right_{{ image.id }}" value="2">
+                                                <span class="radio-text">2 - あまり共感できない</span>
+                                            </label>
+                                            <label class="radio-label">
+                                                <input type="radio" name="score_right_{{ image.id }}" value="3">
+                                                <span class="radio-text">3 - どちらでもない</span>
+                                            </label>
+                                            <label class="radio-label">
+                                                <input type="radio" name="score_right_{{ image.id }}" value="4">
+                                                <span class="radio-text">4 - ある程度共感できる</span>
+                                            </label>
+                                            <label class="radio-label">
+                                                <input type="radio" name="score_right_{{ image.id }}" value="5">
+                                                <span class="radio-text">5 - 非常に共感できる</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="button-group">
+                        <a href="{{ url_for('second') }}" class="btn btn-secondary">戻る</a>
+                        <button type="submit" class="btn btn-primary">評価を送信</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="info-section">
+                <h3>評価について</h3>
+                <ul>
+                    <li>各衣服画像に対する2つのAI予測を確認してください</li>
+                    <li>それぞれの予測がどの程度あなたの感覚と一致しているかを評価してください</li>
+                    <li>すべての画像・すべての予測に対して評価を入力してから送信してください</li>
+                    <li>評価が完了すると、実験は終了します</li>
+                </ul>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 AI Fashion Experiment. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <style>
+        .evaluation-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .evaluation-card {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .card-header h3 {
+            margin: 0;
+            color: #007bff;
+        }
+
+        .image-prediction-row {
+            display: grid;
+            grid-template-columns: 1fr 2fr 2fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .image-column {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .evaluation-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        .prediction-column {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f9f9f9;
+        }
+
+        .prediction-column h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .prediction-text {
+            min-height: 60px;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .rating-section {
+            margin-top: 15px;
+        }
+
+        .rating-section label:first-child {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .rating-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .radio-label {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .radio-label:hover {
+            background: #f0f0f0;
+            border-color: #007bff;
+        }
+
+        .radio-label.checked {
+            background: #e3f2fd;
+            border-color: #007bff;
+            font-weight: bold;
+        }
+
+        .radio-label input[type="radio"] {
+            margin-right: 10px;
+        }
+
+        .radio-text {
+            font-size: 14px;
+        }
+
+        .required {
+            color: #dc3545;
+        }
+
+        @media (max-width: 1024px) {
+            .image-prediction-row {
+                grid-template-columns: 1fr;
+            }
+
+            .image-column {
+                margin-bottom: 15px;
+            }
+        }
+    </style>
+
+    <script>
+        // Form validation
+        const form = document.querySelector('.evaluation-form');
+
+        form.addEventListener('submit', (e) => {
+            const radios = form.querySelectorAll('input[type="radio"]');
+            const groups = {};
+
+            radios.forEach(radio => {
+                const name = radio.name;
+                if (!groups[name]) {
+                    groups[name] = false;
+                }
+                if (radio.checked) {
+                    groups[name] = true;
+                }
+            });
+
+            const allChecked = Object.values(groups).every(v => v);
+
+            if (!allChecked) {
+                e.preventDefault();
+                alert('すべての画像・すべての予測に対して評価を入力してください');
+            }
+        });
+
+        // Highlight checked radio
+        const radioLabels = document.querySelectorAll('.radio-label');
+        radioLabels.forEach(label => {
+            const input = label.querySelector('input[type="radio"]');
+
+            input.addEventListener('change', () => {
+                const parent = label.closest('.rating-options');
+                parent.querySelectorAll('.radio-label').forEach(l => {
+                    l.classList.remove('checked');
+                });
+                if (input.checked) {
+                    label.classList.add('checked');
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

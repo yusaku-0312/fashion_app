@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>エラー</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI衣服評価実験</h1>
+        </header>
+
+        <main>
+            <section class="error-section">
+                <div class="error-content">
+                    <div class="error-icon">!</div>
+                    <h2>エラーが発生しました</h2>
+                    <p class="error-message">{{ error }}</p>
+                    <div class="button-group">
+                        <a href="{{ url_for('index') }}" class="btn btn-primary">ホームに戻る</a>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 AI Fashion Experiment. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <style>
+        .error-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+            padding: 40px 20px;
+        }
+
+        .error-content {
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .error-icon {
+            font-size: 80px;
+            color: #f44336;
+            margin-bottom: 20px;
+        }
+
+        .error-message {
+            font-size: 16px;
+            color: #666;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #ffebee;
+            border-radius: 8px;
+            border-left: 4px solid #f44336;
+        }
+    </style>
+</body>
+</html>
+

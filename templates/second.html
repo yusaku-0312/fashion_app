@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI衣服評価実験 - 嫌いな服をアップロード</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>AI衣服評価実験</h1>
+            <p class="subtitle">あなたの衣服の好みをAIが学習します</p>
+        </header>
+
+        <main>
+            <!-- 重要な注意書き -->
+            <section class="warning-notice">
+                <div class="warning-box">
+                    <strong>⚠️ 重要なお知らせ</strong>
+                    <p>「次へ進む」ボタンを押した後、次のページに移動するまで数分かかる場合があります。</p>
+                    <p>処理中は画面が動かなくても<strong>何もボタンを押さずにそのままお待ちください。</strong></p>
+                </div>
+            </section>
+            <section class="progress-section">
+                <div class="progress-bar">
+                    <div class="progress-step completed">
+                        <span class="step-number">1</span>
+                        <span class="step-label">好きな服</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="progress-step active">
+                        <span class="step-number">2</span>
+                        <span class="step-label">嫌いな服</span>
+                    </div>
+                    <div class="progress-line"></div>
+                    <div class="progress-step">
+                        <span class="step-number">3</span>
+                        <span class="step-label">評価</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="form-section">
+                <h2>ステップ 2: 嫌いな服をアップロード</h2>
+                <p class="instruction">あなたが嫌いな衣服の画像を5枚アップロードしてください。</p>
+
+                {% if error %}
+                <div class="error-message">
+                    <strong>エラー:</strong> {{ error }}
+                </div>
+                {% endif %}
+
+                <form method="POST" enctype="multipart/form-data" class="upload-form">
+                    <input type="hidden" name="account_name" value="{{ account_name }}">
+
+                    <div class="form-group">
+                        <label>アカウント名</label>
+                        <p class="readonly-field">{{ account_name }}</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="dislike_images">好きな服の画像 (5枚) <span class="required">*</span></label>
+                        <div class="file-input-wrapper">
+                            <!-- ファイル入力は非表示 -->
+                            <input type="file" id="dislike_images" name="dislike_images" accept="image/jpeg,image/png"
+                                multiple required style="display:none;">
+                            <!-- クリック可能なボタンラベル -->
+                            <label for="dislike_images" class="file-input-label">
+                                ファイルを選択または、ドラッグ&ドロップ
+                            </label>
+                        </div>
+                        <small>対応形式: JPG, PNG（最大10MB）</small>
+                        <div id="file-list" class="file-list"></div>
+                    </div>
+
+                    <div class="button-group">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">戻る</a>
+                        <button type="submit" class="btn btn-primary">次へ進む</button>
+                    </div>
+                </form>
+            </section>
+
+            <section class="info-section">
+                <h3>このステップについて</h3>
+                <ul>
+                    <li>嫌いな衣服の画像をアップロードしてください</li>
+                    <li>AIはこれらの画像から、あなたが嫌いと判定する基準を学習します</li>
+                    <li>好きな服と嫌いな服の両方の基準を組み合わせて、新しい衣服の印象を予測します</li>
+                </ul>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 AI Fashion Experiment. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        // File input handling
+        const fileInput = document.getElementById('dislike_images');
+        const fileList = document.getElementById('file-list');
+        const fileInputWrapper = document.querySelector('.file-input-wrapper');
+
+        fileInput.addEventListener('change', updateFileList);
+
+        // Drag and drop
+        fileInputWrapper.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileInputWrapper.classList.add('dragover');
+        });
+
+        fileInputWrapper.addEventListener('dragleave', () => {
+            fileInputWrapper.classList.remove('dragover');
+        });
+
+        fileInputWrapper.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileInputWrapper.classList.remove('dragover');
+            fileInput.files = e.dataTransfer.files;
+            updateFileList();
+        });
+
+        function updateFileList() {
+            const files = Array.from(fileInput.files);
+            fileList.innerHTML = '';
+
+            if (files.length === 0) {
+                return;
+            }
+
+            const ul = document.createElement('ul');
+            files.forEach((file, index) => {
+                const li = document.createElement('li');
+                li.textContent = `${index + 1}. ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+                ul.appendChild(li);
+            });
+
+            fileList.appendChild(ul);
+
+            if (files.length < 5) {
+                const warning = document.createElement('p');
+                warning.className = 'warning-text';
+                warning.textContent = `あと ${5 - files.length} 枚アップロードしてください`;
+                fileList.appendChild(warning);
+            } else if (files.length > 5) {
+                const info = document.createElement('p');
+                info.className = 'info-text';
+                info.textContent = `最初の5枚が使用されます`;
+                fileList.appendChild(info);
+            } else {
+                const success = document.createElement('p');
+                success.className = 'success-text';
+                success.textContent = '5枚すべてアップロードされました！';
+                fileList.appendChild(success);
+            }
+        }
+    </script>
+</body>
+
+</html>
