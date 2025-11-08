@@ -11,7 +11,7 @@ import logging
 import random
 from datetime import datetime
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from openai import OpenAI
 
@@ -132,7 +132,7 @@ markdown形式での記述を避け、**などのマークを含めないでく�
     
     try:
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4o-mini",
             max_tokens=1024,
             messages=[
                 {
@@ -194,7 +194,7 @@ def extract_features_from_images(images_paths):
     
     try:
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4o-mini",
             max_tokens=1024,
             messages=[
                 {
@@ -266,7 +266,7 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
     try:
         # Proposed method prediction
         response_propose = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4o-mini",
             max_tokens=256,
             messages=[
                 {
@@ -287,7 +287,7 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
         
         # Comparison method prediction
         response_compare = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4o-mini",
             max_tokens=256,
             messages=[
                 {
@@ -325,6 +325,10 @@ def send_to_n8n(webhook_url, data):
     Returns:
         Boolean indicating success
     """
+    if not webhook_url:
+        logger.warning("N8N webhook URL not configured")
+        return False
+    
     try:
         response = requests.post(webhook_url, json=data, timeout=10)
         if response.status_code == 200:
@@ -380,7 +384,7 @@ def index():
             session['account_name'] = account_name
             session['like_criteria'] = like_criteria
             session['like_features'] = like_features
-            session['like_image_paths'] = image_paths
+            # 画像パスはセッションに保存しない（サイズ削減のため）
             
             n8n_data = {
                 'account_name': account_name,
@@ -411,6 +415,7 @@ def second():
         like_features = session.get('like_features')
         
         if not account_name or not like_criteria or not like_features:
+            logger.warning("Session data missing in second route")
             return redirect(url_for('index'))
         
         uploaded_files = request.files.getlist('dislike_images')
@@ -434,13 +439,15 @@ def second():
         try:
             # 提案手法用：判断基準を抽出
             dislike_criteria = extract_criteria_from_images(image_paths, criteria_type='dislike')
+            logger.info("Dislike criteria extracted successfully")
             
             # 比較手法用：特徴を抽出
             dislike_features = extract_features_from_images(image_paths)
+            logger.info("Dislike features extracted successfully")
             
             session['dislike_criteria'] = dislike_criteria
             session['dislike_features'] = dislike_features
-            session['dislike_image_paths'] = image_paths
+            # 画像パスはセッションに保存しない（サイズ削減のため）
             
             n8n_data = {
                 'account_name': account_name,
@@ -453,51 +460,71 @@ def second():
             evaluation_images = []
             test_data_dir = 'test_data'
             
-            if os.path.exists(test_data_dir):
-                for i in range(1, 21):
-                    img_file = f'test{i}.jpg'
-                    img_path = os.path.join(test_data_dir, img_file)
-                    
-                    if os.path.exists(img_path):
-                        try:
-                            prediction_propose, prediction_compare = predict_impression(
-                                like_criteria, dislike_criteria, like_features, dislike_features, img_path
-                            )
-                            
-                            # ランダムに左右の表示順序を決定
-                            show_propose_left = random.choice([True, False])
-                            
-                            evaluation_images.append({
-                                'id': f'test{i}',
-                                'filename': img_file,
-                                'prediction_propose': prediction_propose or 'エラー',
-                                'prediction_compare': prediction_compare or 'エラー',
-                                'show_propose_left': show_propose_left,
-                                'left_prediction': prediction_propose if show_propose_left else prediction_compare,
-                                'right_prediction': prediction_compare if show_propose_left else prediction_propose,
-                                'left_method': 'propose' if show_propose_left else 'compare',
-                                'right_method': 'compare' if show_propose_left else 'propose'
-                            })
-                        except Exception as e:
-                            logger.error(f"Error predicting for {img_file}: {e}")
-                            evaluation_images.append({
-                                'id': f'test{i}',
-                                'filename': img_file,
-                                'prediction_propose': 'エラー',
-                                'prediction_compare': 'エラー',
-                                'show_propose_left': True,
-                                'left_prediction': 'エラー',
-                                'right_prediction': 'エラー',
-                                'left_method': 'propose',
-                                'right_method': 'compare'
-                            })
+            # test_dataディレクトリの存在確認
+            if not os.path.exists(test_data_dir):
+                logger.error(f"test_data directory not found at: {os.path.abspath(test_data_dir)}")
+                return render_template('second.html', account_name=account_name, 
+                                     error='評価用画像ディレクトリが見つかりません'), 500
             
+            logger.info(f"test_data directory found at: {os.path.abspath(test_data_dir)}")
+            
+            # 各画像に対して印象予測
+            for i in range(1, 21):
+                img_file = f'test{i}.jpg'
+                img_path = os.path.join(test_data_dir, img_file)
+                
+                if os.path.exists(img_path):
+                    try:
+                        logger.info(f"Processing {img_file}...")
+                        prediction_propose, prediction_compare = predict_impression(
+                            like_criteria, dislike_criteria, like_features, dislike_features, img_path
+                        )
+                        
+                        # ランダムに左右の表示順序を決定
+                        show_propose_left = random.choice([True, False])
+                        
+                        # 最小限の情報のみ保存（セッションサイズを削減）
+                        evaluation_images.append({
+                            'id': f'test{i}',
+                            'fn': img_file,  # filename を fn に短縮
+                            'pp': prediction_propose or 'エラー',  # prediction_propose を pp に短縮
+                            'pc': prediction_compare or 'エラー',  # prediction_compare を pc に短縮
+                            'pl': show_propose_left,  # show_propose_left を pl に短縮
+                        })
+                        logger.info(f"Successfully processed {img_file}")
+                        
+                    except Exception as e:
+                        logger.error(f"Error predicting for {img_file}: {e}", exc_info=True)
+                        evaluation_images.append({
+                            'id': f'test{i}',
+                            'fn': img_file,
+                            'pp': 'エラー',
+                            'pc': 'エラー',
+                            'pl': True,
+                        })
+                else:
+                    logger.warning(f"Image not found: {img_path}")
+            
+            logger.info(f"Total evaluation images prepared: {len(evaluation_images)}")
+            
+            if len(evaluation_images) == 0:
+                logger.error("No evaluation images could be processed")
+                return render_template('second.html', account_name=account_name, 
+                                     error='評価用画像の処理に失敗しました'), 500
+            
+            # セッションに保存
             session['evaluation_images'] = evaluation_images
+            session.modified = True
+            
+            logger.info(f"Saved {len(evaluation_images)} evaluation images to session")
+            logger.info(f"Redirecting to output page...")
+            
             return redirect(url_for('output'))
         
         except Exception as e:
-            logger.error(f"Error processing dislike images: {e}")
-            return render_template('second.html', account_name=account_name, error=f'エラーが発生しました: {str(e)}'), 500
+            logger.error(f"Error processing dislike images: {e}", exc_info=True)
+            return render_template('second.html', account_name=account_name, 
+                                 error=f'エラーが発生しました: {str(e)}'), 500
     
     account_name = session.get('account_name')
     if not account_name:
@@ -512,33 +539,60 @@ def output():
     Route for displaying prediction results and evaluation form.
     印象予測結果と評価フォーム
     """
+    account_name = session.get('account_name')
+    evaluation_images = session.get('evaluation_images', [])
+    
+    # デバッグ用ログ
+    logger.info(f"=== OUTPUT ROUTE ACCESSED ===")
+    logger.info(f"Method: {request.method}")
+    logger.info(f"Account name: {account_name}")
+    logger.info(f"Evaluation images count: {len(evaluation_images)}")
+    
+    if not account_name:
+        logger.warning("No account_name in session, redirecting to index")
+        return redirect(url_for('index'))
+    
+    if not evaluation_images:
+        logger.warning("No evaluation_images in session, redirecting to index")
+        return redirect(url_for('index'))
+    
+    # 短縮されたデータを元の形式に展開
+    expanded_images = []
+    for img in evaluation_images:
+        show_propose_left = img.get('pl', True)
+        expanded_images.append({
+            'id': img['id'],
+            'filename': img['fn'],
+            'prediction_propose': img['pp'],
+            'prediction_compare': img['pc'],
+            'show_propose_left': show_propose_left,
+            'left_prediction': img['pp'] if show_propose_left else img['pc'],
+            'right_prediction': img['pc'] if show_propose_left else img['pp'],
+            'left_method': 'propose' if show_propose_left else 'compare',
+            'right_method': 'compare' if show_propose_left else 'propose'
+        })
+    
     if request.method == 'POST':
-        account_name = session.get('account_name')
-        evaluation_images = session.get('evaluation_images', [])
-        
-        if not account_name or not evaluation_images:
-            return redirect(url_for('index'))
-        
         scores_left = {}
         scores_right = {}
         
-        for img in evaluation_images:
+        for img in expanded_images:
             img_id = img['id']
             score_left = request.form.get(f'score_left_{img_id}')
             score_right = request.form.get(f'score_right_{img_id}')
             
             if not score_left or not score_right:
-                return render_template('output.html', evaluation_images=evaluation_images, 
+                return render_template('output.html', evaluation_images=expanded_images, 
                                      error='すべての画像に対して評価を入力してください'), 400
             try:
                 scores_left[img_id] = int(score_left)
                 scores_right[img_id] = int(score_right)
             except ValueError:
-                return render_template('output.html', evaluation_images=evaluation_images, 
+                return render_template('output.html', evaluation_images=expanded_images, 
                                      error='無効な評価値です'), 400
         
         results = []
-        for img in evaluation_images:
+        for img in expanded_images:
             img_id = img['id']
             
             # 提案手法と比較手法のスコアを正しく振り分ける
@@ -568,13 +622,8 @@ def output():
         session.clear()
         return redirect(url_for('thanks_page'))
     
-    account_name = session.get('account_name')
-    evaluation_images = session.get('evaluation_images', [])
-    
-    if not account_name or not evaluation_images:
-        return redirect(url_for('index'))
-    
-    return render_template('output.html', evaluation_images=evaluation_images)
+    logger.info(f"Rendering output.html with {len(expanded_images)} images")
+    return render_template('output.html', evaluation_images=expanded_images)
 
 
 @app.route('/thanks-page')
@@ -586,7 +635,6 @@ def thanks_page():
 @app.route('/test_data/<filename>')
 def serve_test_image(filename):
     """Serve test data images."""
-    from flask import send_from_directory
     return send_from_directory('test_data', filename)
 
 
