@@ -154,13 +154,77 @@ markdown形式での記述を避け、**などのマークを含めないでく�
         raise
 
 
-def predict_impression(like_criteria, dislike_criteria, image_path):
+def extract_features_from_images(images_paths):
     """
-    Predict impression of a clothing image based on extracted criteria.
+    Extract features from clothing images using OpenAI API (for comparison method).
     
     Args:
-        like_criteria: Extracted criteria for liked clothes
-        dislike_criteria: Extracted criteria for disliked clothes
+        images_paths: List of file paths to images
+    
+    Returns:
+        Extracted features as string (bullet points)
+    """
+    
+    system_prompt = """これらの服の特徴を箇条書きで10個書いてください。出力は箇条書きで、markdown形式の記述を避けてください。"""
+    
+    # Build image content for API
+    image_content = []
+    for img_path in images_paths:
+        if not os.path.exists(img_path):
+            logger.warning(f"Image file not found: {img_path}")
+            continue
+        
+        base64_image = encode_image_to_base64(img_path)
+        if base64_image:
+            media_type = get_image_media_type(img_path)
+            image_content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{media_type};base64,{base64_image}",
+                    "detail": "auto"
+                }
+            })
+    
+    if not image_content:
+        raise ValueError("No valid images could be processed")
+    
+    # Call OpenAI API
+    if not client:
+        raise ValueError("OpenAI client is not initialized. Please set OPENAI_API_KEY.")
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4.1-nano",
+            max_tokens=1024,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": system_prompt},
+                        *image_content
+                    ]
+                }
+            ]
+        )
+        
+        features = response.choices[0].message.content
+        logger.info(f"Extracted features successfully")
+        return features
+    
+    except Exception as e:
+        logger.error(f"OpenAI API error: {e}")
+        raise
+
+
+def predict_impression(like_criteria, dislike_criteria, like_features, dislike_features, image_path):
+    """
+    Predict impression of a clothing image based on extracted criteria and features.
+    
+    Args:
+        like_criteria: Extracted criteria for liked clothes (for proposed method)
+        dislike_criteria: Extracted criteria for disliked clothes (for proposed method)
+        like_features: Extracted features for liked clothes (for comparison method)
+        dislike_features: Extracted features for disliked clothes (for comparison method)
         image_path: Path to the evaluation image
     
     Returns:
@@ -188,14 +252,16 @@ def predict_impression(like_criteria, dislike_criteria, image_path):
 これらのファッションに対する判断基準を持つ人が、この衣服画像を見た時にどんな印象を持つか一人称視点で予測してください。
 出力は短文で１つだけ簡潔にお願いします。"""
     
-    # Prediction with only like criteria (comparison method)
-    compare_prompt = f"""##判断基準
-###好きな服から抽出された「どんな服を好みであると認定するかの判断基準」
-{like_criteria}
+    # Prediction with features (comparison method)
+    compare_prompt = f"""##服の特徴
+###好きな服から抽出された特徴
+{like_features}
+###嫌いな服から抽出された特徴
+{dislike_features}
 ##指示
-上記の判断基準はユーザーが実際に好きな服からLLMによって抽出された判断基準です。
-このファッションに対する判断基準を持つ人が、この衣服画像を見た時にどんな印象を持つか一人称視点で予測してください。
-出力は短文で１つだけ簡潔にお願いします。"""
+上記の服の特徴はユーザーの実際に好きな服と嫌いな服からLLMによって抽出されたそれらの服の特徴です。
+これらの特徴を参考にし、その人がこの衣服画像を見た時にどんな印象を持つか一人称視点で予測してください。
+出力は短文で１個簡潔にお願いします。"""
     
     try:
         # Proposed method prediction
@@ -305,15 +371,22 @@ def index():
             return render_template('index.html', error='有効な画像ファイルが5枚に達しません'), 400
         
         try:
+            # 提案手法用：判断基準を抽出
             like_criteria = extract_criteria_from_images(image_paths, criteria_type='like')
+            
+            # 比較手法用：特徴を抽出
+            like_features = extract_features_from_images(image_paths)
+            
             session['account_name'] = account_name
             session['like_criteria'] = like_criteria
+            session['like_features'] = like_features
             session['like_image_paths'] = image_paths
             
             n8n_data = {
                 'account_name': account_name,
                 'timestamp': datetime.now().isoformat(),
-                'like_criteria': like_criteria
+                'like_criteria': like_criteria,
+                'like_features': like_features
             }
             send_to_n8n(N8N_WEBHOOK_LIKE, n8n_data)
             
@@ -335,8 +408,9 @@ def second():
     if request.method == 'POST':
         account_name = session.get('account_name')
         like_criteria = session.get('like_criteria')
+        like_features = session.get('like_features')
         
-        if not account_name or not like_criteria:
+        if not account_name or not like_criteria or not like_features:
             return redirect(url_for('index'))
         
         uploaded_files = request.files.getlist('dislike_images')
@@ -358,14 +432,21 @@ def second():
             return render_template('second.html', account_name=account_name, error='有効な画像ファイルが5枚に達しません'), 400
         
         try:
+            # 提案手法用：判断基準を抽出
             dislike_criteria = extract_criteria_from_images(image_paths, criteria_type='dislike')
+            
+            # 比較手法用：特徴を抽出
+            dislike_features = extract_features_from_images(image_paths)
+            
             session['dislike_criteria'] = dislike_criteria
+            session['dislike_features'] = dislike_features
             session['dislike_image_paths'] = image_paths
             
             n8n_data = {
                 'account_name': account_name,
                 'timestamp': datetime.now().isoformat(),
-                'dislike_criteria': dislike_criteria
+                'dislike_criteria': dislike_criteria,
+                'dislike_features': dislike_features
             }
             send_to_n8n(N8N_WEBHOOK_DISLIKE, n8n_data)
             
@@ -380,7 +461,7 @@ def second():
                     if os.path.exists(img_path):
                         try:
                             prediction_propose, prediction_compare = predict_impression(
-                                like_criteria, dislike_criteria, img_path
+                                like_criteria, dislike_criteria, like_features, dislike_features, img_path
                             )
                             
                             # ランダムに左右の表示順序を決定
