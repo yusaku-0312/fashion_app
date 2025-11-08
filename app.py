@@ -266,7 +266,7 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
     try:
         # Proposed method prediction
         response_propose = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-nano",
             max_tokens=256,
             messages=[
                 {
