@@ -268,7 +268,7 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
         # Proposed method prediction
         response_propose = client.chat.completions.create(
             model="gpt-4o-mini",
-            max_tokens=256,
+            max_tokens=1024,
             messages=[
                 {
                     "role": "user",
@@ -290,7 +290,7 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
         # Comparison method prediction
         response_compare = client.chat.completions.create(
             model="gpt-4o-mini",
-            max_tokens=256,
+            max_tokens=1024,
             messages=[
                 {
                     "role": "user",
