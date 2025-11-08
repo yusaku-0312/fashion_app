@@ -4,6 +4,7 @@ Flask Application for AI Fashion Experiment
 """
 
 import os
+import time
 import base64
 import json
 import requests
