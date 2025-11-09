@@ -133,7 +133,7 @@ markdown形式での記述を避け、**などのマークを含めないでく�
     
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-nano",
             max_tokens=1024,
             messages=[
                 {
@@ -195,7 +195,7 @@ def extract_features_from_images(images_paths):
     
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-nano",
             max_tokens=1024,
             messages=[
                 {
@@ -267,7 +267,7 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
     try:
         # Proposed method prediction
         response_propose = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-nano",
             max_tokens=1024,
             messages=[
                 {
@@ -289,7 +289,7 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
         time.sleep(1)
         # Comparison method prediction
         response_compare = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4.1-nano",
             max_tokens=1024,
             messages=[
                 {
