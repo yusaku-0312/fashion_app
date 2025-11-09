@@ -133,7 +133,7 @@ markdown形式での記述を避け、**などのマークを含めないでく�
     
     try:
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4o-mini",
             max_tokens=1024,
             messages=[
                 {
@@ -148,6 +148,7 @@ markdown形式での記述を避け、**などのマークを含めないでく�
         
         criteria = response.choices[0].message.content
         logger.info(f"Extracted {criteria_type} criteria successfully")
+        logger.info(f"[{criteria_type.upper()} CRITERIA]:\n{criteria}")
         return criteria
     
     except Exception as e:
@@ -195,7 +196,7 @@ def extract_features_from_images(images_paths):
     
     try:
         response = client.chat.completions.create(
-            model="gpt-4.1-nano",
+            model="gpt-4o-mini",
             max_tokens=1024,
             messages=[
                 {
@@ -210,6 +211,7 @@ def extract_features_from_images(images_paths):
         
         features = response.choices[0].message.content
         logger.info(f"Extracted features successfully")
+        logger.info(f"[FEATURES]:\n{features}")
         return features
     
     except Exception as e:
@@ -217,7 +219,7 @@ def extract_features_from_images(images_paths):
         raise
 
 
-def predict_impression(like_criteria, dislike_criteria, like_features, dislike_features, image_path):
+def predict_impression(like_criteria, dislike_criteria, like_features, dislike_features, image_path, retry_count=3, retry_delay=2):
     """
     Predict impression of a clothing image based on extracted criteria and features.
     
@@ -227,6 +229,8 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
         like_features: Extracted features for liked clothes (for comparison method)
         dislike_features: Extracted features for disliked clothes (for comparison method)
         image_path: Path to the evaluation image
+        retry_count: Number of retries on rate limit error
+        retry_delay: Delay in seconds between retries
     
     Returns:
         Tuple of (prediction_propose, prediction_compare)
@@ -241,6 +245,7 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
         return None, None
     
     media_type = get_image_media_type(image_path)
+    image_name = os.path.basename(image_path)
     
     # Prediction with both criteria (proposed method)
     propose_prompt = f"""##判断基準
@@ -264,56 +269,94 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
 これらの特徴を参考にし、その人がこの衣服画像を見た時にどんな印象を持つか一人称視点で予測してください。
 出力は短文で１個簡潔にお願いします。"""
     
-    try:
-        # Proposed method prediction
-        response_propose = client.chat.completions.create(
-            model="gpt-4.1-nano",
-            max_tokens=1024,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": propose_prompt},
-                        {"type": "image_url",
-                         "image_url": {
-                             "url": f"data:{media_type};base64,{base64_image}",
-                             "detail": "auto"
-                         }}
-                    ]
-                }
-            ]
-        )
-        
-        prediction_propose = response_propose.choices[0].message.content
-        
-        time.sleep(1)
-        # Comparison method prediction
-        response_compare = client.chat.completions.create(
-            model="gpt-4.1-nano",
-            max_tokens=1024,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": compare_prompt},
-                        {"type": "image_url",
-                         "image_url": {
-                             "url": f"data:{media_type};base64,{base64_image}",
-                             "detail": "auto"
-                         }}
-                    ]
-                }
-            ]
-        )
-        
-        prediction_compare = response_compare.choices[0].message.content
-        
-        logger.info(f"Predicted impression for {image_path}")
-        return prediction_propose, prediction_compare
+    prediction_propose = None
+    prediction_compare = None
     
-    except Exception as e:
-        logger.error(f"OpenAI API error during prediction: {e}")
-        return None, None
+    # Proposed method prediction with retry
+    for attempt in range(retry_count):
+        try:
+            response_propose = client.chat.completions.create(
+                model="gpt-4o-mini",
+                max_tokens=256,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": propose_prompt},
+                            {"type": "image_url",
+                             "image_url": {
+                                 "url": f"data:{media_type};base64,{base64_image}",
+                                 "detail": "auto"
+                             }}
+                        ]
+                    }
+                ]
+            )
+            prediction_propose = response_propose.choices[0].message.content
+            logger.info(f"[PROPOSE] {image_name}: {prediction_propose}")
+            break
+        except Exception as e:
+            error_str = str(e).lower()
+            if "rate_limit" in error_str or "429" in error_str:
+                logger.warning(f"Rate limit hit for propose method on {image_name}, attempt {attempt + 1}/{retry_count}")
+                if attempt < retry_count - 1:
+                    wait_time = retry_delay * (attempt + 1)
+                    logger.info(f"Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Rate limit exceeded after {retry_count} attempts for propose method on {image_name}")
+                    prediction_propose = None
+            else:
+                logger.error(f"OpenAI API error during propose prediction for {image_name}: {e}")
+                prediction_propose = None
+                break
+    
+    # 提案手法と比較手法の間に待機時間を入れる
+    time.sleep(1)
+    
+    # Comparison method prediction with retry
+    for attempt in range(retry_count):
+        try:
+            response_compare = client.chat.completions.create(
+                model="gpt-4o-mini",
+                max_tokens=256,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": compare_prompt},
+                            {"type": "image_url",
+                             "image_url": {
+                                 "url": f"data:{media_type};base64,{base64_image}",
+                                 "detail": "auto"
+                             }}
+                        ]
+                    }
+                ]
+            )
+            prediction_compare = response_compare.choices[0].message.content
+            logger.info(f"[COMPARE] {image_name}: {prediction_compare}")
+            break
+        except Exception as e:
+            error_str = str(e).lower()
+            if "rate_limit" in error_str or "429" in error_str:
+                logger.warning(f"Rate limit hit for compare method on {image_name}, attempt {attempt + 1}/{retry_count}")
+                if attempt < retry_count - 1:
+                    wait_time = retry_delay * (attempt + 1)
+                    logger.info(f"Waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Rate limit exceeded after {retry_count} attempts for compare method on {image_name}")
+                    prediction_compare = None
+            else:
+                logger.error(f"OpenAI API error during compare prediction for {image_name}: {e}")
+                prediction_compare = None
+                break
+    
+    if prediction_propose and prediction_compare:
+        logger.info(f"Successfully predicted impressions for {image_name}")
+    
+    return prediction_propose, prediction_compare
 
 
 def send_to_n8n(webhook_url, data):
@@ -386,7 +429,6 @@ def index():
             session['account_name'] = account_name
             session['like_criteria'] = like_criteria
             session['like_features'] = like_features
-            # 画像パスはセッションに保存しない（サイズ削減のため）
             
             n8n_data = {
                 'account_name': account_name,
@@ -399,7 +441,7 @@ def index():
             return redirect(url_for('second'))
         
         except Exception as e:
-            logger.error(f"Error processing like images: {e}")
+            logger.error(f"Error processing like images: {e}", exc_info=True)
             return render_template('index.html', error=f'エラーが発生しました: {str(e)}'), 500
     
     return render_template('index.html')
@@ -449,7 +491,6 @@ def second():
             
             session['dislike_criteria'] = dislike_criteria
             session['dislike_features'] = dislike_features
-            # 画像パスはセッションに保存しない（サイズ削減のため）
             
             n8n_data = {
                 'account_name': account_name,
@@ -481,28 +522,34 @@ def second():
                         prediction_propose, prediction_compare = predict_impression(
                             like_criteria, dislike_criteria, like_features, dislike_features, img_path
                         )
-                        time.sleep(2)
+                        
                         # ランダムに左右の表示順序を決定
                         show_propose_left = random.choice([True, False])
                         
+                        # 印象文を80文字に制限してセッションサイズを削減
+                        pp_short = (prediction_propose or 'エラー')[:80]
+                        pc_short = (prediction_compare or 'エラー')[:80]
+                        
                         # 最小限の情報のみ保存（セッションサイズを削減）
                         evaluation_images.append({
-                            'id': f'test{i}',
-                            'fn': img_file,  # filename を fn に短縮
-                            'pp': prediction_propose or 'エラー',  # prediction_propose を pp に短縮
-                            'pc': prediction_compare or 'エラー',  # prediction_compare を pc に短縮
-                            'pl': show_propose_left,  # show_propose_left を pl に短縮
+                            'i': i,  # IDを数字のみに
+                            'pp': pp_short,
+                            'pc': pc_short,
+                            'pl': 1 if show_propose_left else 0,  # boolを0/1に
                         })
                         logger.info(f"Successfully processed {img_file}")
+                        
+                        # 各画像処理の後に待機時間を追加（レート制限回避）
+                        if i < 20:
+                            time.sleep(2)
                         
                     except Exception as e:
                         logger.error(f"Error predicting for {img_file}: {e}", exc_info=True)
                         evaluation_images.append({
-                            'id': f'test{i}',
-                            'fn': img_file,
+                            'i': i,
                             'pp': 'エラー',
                             'pc': 'エラー',
-                            'pl': True,
+                            'pl': 1,
                         })
                 else:
                     logger.warning(f"Image not found: {img_path}")
@@ -518,6 +565,15 @@ def second():
             session['evaluation_images'] = evaluation_images
             session.modified = True
             
+            # 印象予測完了後、判断基準・特徴はもう不要なので削除（セッションサイズ削減）
+            session.pop('like_criteria', None)
+            session.pop('dislike_criteria', None)
+            session.pop('like_features', None)
+            session.pop('dislike_features', None)
+            
+            # セッションサイズをログに出力
+            session_size = len(json.dumps(dict(session)))
+            logger.info(f"Session size after cleanup: {session_size} bytes")
             logger.info(f"Saved {len(evaluation_images)} evaluation images to session")
             logger.info(f"Redirecting to output page...")
             
@@ -561,10 +617,12 @@ def output():
     # 短縮されたデータを元の形式に展開
     expanded_images = []
     for img in evaluation_images:
-        show_propose_left = img.get('pl', True)
+        i = img['i']
+        show_propose_left = bool(img['pl'])
+        
         expanded_images.append({
-            'id': img['id'],
-            'filename': img['fn'],
+            'id': f'test{i}',
+            'filename': f'test{i}.jpg',
             'prediction_propose': img['pp'],
             'prediction_compare': img['pc'],
             'show_propose_left': show_propose_left,
