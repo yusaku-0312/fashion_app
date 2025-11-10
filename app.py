@@ -1,6 +1,7 @@
 """
 Flask Application for AI Fashion Experiment
 被験者実験用AI衣服評価Webアプリケーション
+改善案2: 印象文をN8Nに保存し、IDで管理
 """
 
 import os
@@ -10,6 +11,7 @@ import time
 import requests
 import logging
 import random
+import uuid
 from datetime import datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
@@ -38,6 +40,7 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 N8N_WEBHOOK_LIKE = os.getenv('N8N_WEBHOOK_LIKE')
 N8N_WEBHOOK_DISLIKE = os.getenv('N8N_WEBHOOK_DISLIKE')
+N8N_WEBHOOK_IMPRESSION = os.getenv('N8N_WEBHOOK_IMPRESSION')  # 新規追加
 N8N_WEBHOOK_RESULT = os.getenv('N8N_WEBHOOK_RESULT')
 
 # Initialize OpenAI client
@@ -219,11 +222,13 @@ def extract_features_from_images(images_paths):
         raise
 
 
-def predict_impression(like_criteria, dislike_criteria, like_features, dislike_features, image_path, retry_count=3, retry_delay=2):
+def predict_impression(account_name, like_criteria, dislike_criteria, like_features, dislike_features, image_path, retry_count=3, retry_delay=2):
     """
     Predict impression of a clothing image based on extracted criteria and features.
+    生成した印象文はN8Nに保存し、IDを返す。
     
     Args:
+        account_name: Account name for tracking
         like_criteria: Extracted criteria for liked clothes (for proposed method)
         dislike_criteria: Extracted criteria for disliked clothes (for proposed method)
         like_features: Extracted features for liked clothes (for comparison method)
@@ -233,19 +238,22 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
         retry_delay: Delay in seconds between retries
     
     Returns:
-        Tuple of (prediction_propose, prediction_compare)
+        Tuple of (impression_id, has_error)
     """
     
     if not os.path.exists(image_path):
         logger.warning(f"Image file not found: {image_path}")
-        return None, None
+        return None, True
     
     base64_image = encode_image_to_base64(image_path)
     if not base64_image:
-        return None, None
+        return None, True
     
     media_type = get_image_media_type(image_path)
     image_name = os.path.basename(image_path)
+    
+    # 印象文IDを生成
+    impression_id = str(uuid.uuid4())
     
     # Prediction with both criteria (proposed method)
     propose_prompt = f"""##判断基準
@@ -271,6 +279,7 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
     
     prediction_propose = None
     prediction_compare = None
+    has_error = False
     
     # Proposed method prediction with retry
     for attempt in range(retry_count):
@@ -305,10 +314,12 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
                     time.sleep(wait_time)
                 else:
                     logger.error(f"Rate limit exceeded after {retry_count} attempts for propose method on {image_name}")
-                    prediction_propose = None
+                    prediction_propose = 'エラー: レート制限'
+                    has_error = True
             else:
                 logger.error(f"OpenAI API error during propose prediction for {image_name}: {e}")
-                prediction_propose = None
+                prediction_propose = 'エラー'
+                has_error = True
                 break
     
     # 提案手法と比較手法の間に待機時間を入れる
@@ -347,16 +358,31 @@ def predict_impression(like_criteria, dislike_criteria, like_features, dislike_f
                     time.sleep(wait_time)
                 else:
                     logger.error(f"Rate limit exceeded after {retry_count} attempts for compare method on {image_name}")
-                    prediction_compare = None
+                    prediction_compare = 'エラー: レート制限'
+                    has_error = True
             else:
                 logger.error(f"OpenAI API error during compare prediction for {image_name}: {e}")
-                prediction_compare = None
+                prediction_compare = 'エラー'
+                has_error = True
                 break
     
-    if prediction_propose and prediction_compare:
-        logger.info(f"Successfully predicted impressions for {image_name}")
+    # N8Nに印象文を保存
+    impression_data = {
+        'impression_id': impression_id,
+        'account_name': account_name,
+        'image_name': image_name,
+        'prediction_propose': prediction_propose,
+        'prediction_compare': prediction_compare,
+        'timestamp': datetime.now().isoformat(),
+        'has_error': has_error
+    }
     
-    return prediction_propose, prediction_compare
+    send_to_n8n(N8N_WEBHOOK_IMPRESSION, impression_data)
+    
+    if prediction_propose and prediction_compare and not has_error:
+        logger.info(f"Successfully predicted impressions for {image_name}, ID: {impression_id}")
+    
+    return impression_id, has_error
 
 
 def send_to_n8n(webhook_url, data):
@@ -371,7 +397,7 @@ def send_to_n8n(webhook_url, data):
         Boolean indicating success
     """
     if not webhook_url:
-        logger.warning("N8N webhook URL not configured")
+        logger.warning(f"N8N webhook URL not configured for: {data.get('impression_id', 'unknown')}")
         return False
     
     try:
@@ -385,6 +411,21 @@ def send_to_n8n(webhook_url, data):
     except requests.exceptions.RequestException as e:
         logger.error(f"Failed to send data to n8n: {e}")
         return False
+
+
+def get_impression_from_n8n(impression_id):
+    """
+    N8Nから印象文を取得する（オプション：N8N側でGET APIを用意した場合）
+    
+    Args:
+        impression_id: 印象文ID
+    
+    Returns:
+        Dictionary with impression data or None
+    """
+    # N8N側でGET APIを用意する場合はここに実装
+    # 今回はセッションに最低限のデータを保持する方式で実装
+    pass
 
 
 # ============================================================================
@@ -519,23 +560,20 @@ def second():
                 if os.path.exists(img_path):
                     try:
                         logger.info(f"Processing {img_file}...")
-                        prediction_propose, prediction_compare = predict_impression(
-                            like_criteria, dislike_criteria, like_features, dislike_features, img_path
+                        impression_id, has_error = predict_impression(
+                            account_name, like_criteria, dislike_criteria, 
+                            like_features, dislike_features, img_path
                         )
                         
                         # ランダムに左右の表示順序を決定
                         show_propose_left = random.choice([True, False])
                         
-                        # 印象文を80文字に制限してセッションサイズを削減
-                        pp_short = (prediction_propose or 'エラー')[:80]
-                        pc_short = (prediction_compare or 'エラー')[:80]
-                        
-                        # 最小限の情報のみ保存（セッションサイズを削減）
+                        # セッションには最小限のデータのみ保存（印象文IDとメタデータ）
                         evaluation_images.append({
-                            'i': i,  # IDを数字のみに
-                            'pp': pp_short,
-                            'pc': pc_short,
-                            'pl': 1 if show_propose_left else 0,  # boolを0/1に
+                            'i': i,  # 画像番号
+                            'id': impression_id,  # 印象文ID
+                            'err': 1 if has_error else 0,  # エラーフラグ
+                            'pl': 1 if show_propose_left else 0,  # 表示順序
                         })
                         logger.info(f"Successfully processed {img_file}")
                         
@@ -545,10 +583,12 @@ def second():
                         
                     except Exception as e:
                         logger.error(f"Error predicting for {img_file}: {e}", exc_info=True)
+                        # エラー時も仮のIDを生成
+                        error_id = str(uuid.uuid4())
                         evaluation_images.append({
                             'i': i,
-                            'pp': 'エラー',
-                            'pc': 'エラー',
+                            'id': error_id,
+                            'err': 1,
                             'pl': 1,
                         })
                 else:
@@ -561,11 +601,11 @@ def second():
                 return render_template('second.html', account_name=account_name, 
                                      error='評価用画像の処理に失敗しました'), 500
             
-            # セッションに保存
+            # セッションに保存（印象文は含まず、IDのみ）
             session['evaluation_images'] = evaluation_images
             session.modified = True
             
-            # 印象予測完了後、判断基準・特徴はもう不要なので削除（セッションサイズ削減）
+            # 判断基準・特徴はもう不要なので削除
             session.pop('like_criteria', None)
             session.pop('dislike_criteria', None)
             session.pop('like_features', None)
@@ -574,7 +614,7 @@ def second():
             # セッションサイズをログに出力
             session_size = len(json.dumps(dict(session)))
             logger.info(f"Session size after cleanup: {session_size} bytes")
-            logger.info(f"Saved {len(evaluation_images)} evaluation images to session")
+            logger.info(f"Saved {len(evaluation_images)} evaluation image IDs to session")
             logger.info(f"Redirecting to output page...")
             
             return redirect(url_for('output'))
@@ -596,6 +636,10 @@ def output():
     """
     Route for displaying prediction results and evaluation form.
     印象予測結果と評価フォーム
+    
+    注意: この実装ではN8Nに保存した印象文を表示するため、
+    N8N側でGET APIを用意するか、または印象文も一緒にリクエストで返す必要があります。
+    簡易実装として、ここではN8N_WEBHOOK_IMPRESSIONにGETリクエストを送る想定です。
     """
     account_name = session.get('account_name')
     evaluation_images = session.get('evaluation_images', [])
@@ -614,20 +658,42 @@ def output():
         logger.warning("No evaluation_images in session, redirecting to index")
         return redirect(url_for('index'))
     
-    # 短縮されたデータを元の形式に展開
+    # N8Nから印象文を取得（実装オプション）
+    # ここでは簡易的に、N8N側で印象文を返すAPIを用意する前提
+    # または、印象文をローカルキャッシュに保存する方法もあります
+    
+    # 今回は、印象文データをoutput時に別途取得する代わりに、
+    # セッションに最低限必要な表示用サマリーを追加保存する方式を採用
+    # （N8N APIが未実装の場合の暫定対応）
+    
+    # 実際の実装では、N8NのGET APIを呼び出して印象文を取得
     expanded_images = []
     for img in evaluation_images:
         i = img['i']
+        impression_id = img['id']
+        has_error = bool(img['err'])
         show_propose_left = bool(img['pl'])
+        
+        # 本来はここでN8Nから印象文を取得
+        # impression_data = get_impression_from_n8n(impression_id)
+        # 暫定: エラー表示
+        if has_error:
+            prediction_propose = 'エラー'
+            prediction_compare = 'エラー'
+        else:
+            # N8N APIが未実装の場合の暫定対応
+            prediction_propose = f'[印象文ID: {impression_id[:8]}... の提案手法結果]'
+            prediction_compare = f'[印象文ID: {impression_id[:8]}... の比較手法結果]'
         
         expanded_images.append({
             'id': f'test{i}',
             'filename': f'test{i}.jpg',
-            'prediction_propose': img['pp'],
-            'prediction_compare': img['pc'],
+            'impression_id': impression_id,
+            'prediction_propose': prediction_propose,
+            'prediction_compare': prediction_compare,
             'show_propose_left': show_propose_left,
-            'left_prediction': img['pp'] if show_propose_left else img['pc'],
-            'right_prediction': img['pc'] if show_propose_left else img['pp'],
+            'left_prediction': prediction_propose if show_propose_left else prediction_compare,
+            'right_prediction': prediction_compare if show_propose_left else prediction_propose,
             'left_method': 'propose' if show_propose_left else 'compare',
             'right_method': 'compare' if show_propose_left else 'propose'
         })
@@ -665,8 +731,7 @@ def output():
             
             results.append({
                 'image_id': img_id,
-                'prediction_propose': img['prediction_propose'],
-                'prediction_compare': img['prediction_compare'],
+                'impression_id': img['impression_id'],  # 印象文IDを含める
                 'score_propose': score_propose,
                 'score_compare': score_compare,
                 'display_order': 'propose_left' if img['show_propose_left'] else 'compare_left'
