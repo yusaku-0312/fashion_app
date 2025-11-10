@@ -380,8 +380,6 @@ def predict_impression(account_name, like_criteria, dislike_criteria, like_featu
         'has_error': has_error
     }
     
-    send_to_n8n(N8N_WEBHOOK_IMPRESSION, impression_data)
-    
     if prediction_propose and prediction_compare and not has_error:
         logger.info(f"Successfully predicted impressions for {image_name}, ID: {impression_id}")
     
@@ -535,6 +533,7 @@ def second():
             
             # メモリ上に印象文を保持する配列
             impressions_list = []
+            impressions_for_save = []
             test_data_dir = 'test_data'
             
             # test_dataディレクトリの存在確認
@@ -572,6 +571,15 @@ def second():
                                 'show_propose_left': show_propose_left,
                                 'has_error': impression_data['has_error']
                             })
+                            impressions_for_save.append({
+                                'image_name': impression_data['image_name'],
+                                'account_name': impression_data['account_name'],
+                                'impression_id': impression_data['impression_id'],
+                                'prediction_propose': impression_data['prediction_propose'],
+                                'prediction_compare': impression_data['prediction_compare'],
+                                'has_error': impression_data['has_error']
+                            })
+                            
                             logger.info(f"Successfully processed {img_file}")
                         
                         # 各画像処理の後に待機時間を追加（レート制限回避）
@@ -591,7 +599,7 @@ def second():
                         })
                 else:
                     logger.warning(f"Image not found: {img_path}")
-            
+            send_to_n8n(N8N_WEBHOOK_IMPRESSION, {"data": impressions_for_save})
             logger.info(f"Total evaluation images prepared: {len(impressions_list)}")
             
             if len(impressions_list) == 0:
