@@ -387,8 +387,10 @@ def predict_impression(account_name, like_criteria, dislike_criteria, like_featu
     return {
         'impression_id': impression_id,
         'image_name': image_name,
+        'account_name': account_name,
         'prediction_propose': prediction_propose,
         'prediction_compare': prediction_compare,
+        'timestamp': datetime.now().isoformat(),
         'has_error': has_error
     }
 
