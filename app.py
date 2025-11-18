@@ -380,6 +380,8 @@ def predict_impression(account_name, like_criteria, dislike_criteria, like_featu
         'has_error': has_error
     }
     
+    send_to_n8n(N8N_WEBHOOK_IMPRESSION, impression_data)
+    
     if prediction_propose and prediction_compare and not has_error:
         logger.info(f"Successfully predicted impressions for {image_name}, ID: {impression_id}")
     
@@ -387,10 +389,8 @@ def predict_impression(account_name, like_criteria, dislike_criteria, like_featu
     return {
         'impression_id': impression_id,
         'image_name': image_name,
-        'account_name': account_name,
         'prediction_propose': prediction_propose,
         'prediction_compare': prediction_compare,
-        'timestamp': datetime.now().isoformat(),
         'has_error': has_error
     }
 
@@ -535,7 +535,6 @@ def second():
             
             # メモリ上に印象文を保持する配列
             impressions_list = []
-            impressions_for_save = []
             test_data_dir = 'test_data'
             
             # test_dataディレクトリの存在確認
@@ -573,15 +572,6 @@ def second():
                                 'show_propose_left': show_propose_left,
                                 'has_error': impression_data['has_error']
                             })
-                            impressions_for_save.append({
-                                'image_name': impression_data['image_name'],
-                                'account_name': impression_data['account_name'],
-                                'impression_id': impression_data['impression_id'],
-                                'prediction_propose': impression_data['prediction_propose'],
-                                'prediction_compare': impression_data['prediction_compare'],
-                                'has_error': impression_data['has_error']
-                            })
-                            
                             logger.info(f"Successfully processed {img_file}")
                         
                         # 各画像処理の後に待機時間を追加（レート制限回避）
@@ -601,7 +591,7 @@ def second():
                         })
                 else:
                     logger.warning(f"Image not found: {img_path}")
-            send_to_n8n(N8N_WEBHOOK_IMPRESSION, {"data": impressions_for_save})
+            
             logger.info(f"Total evaluation images prepared: {len(impressions_list)}")
             
             if len(impressions_list) == 0:
@@ -664,6 +654,7 @@ def output():
     expanded_images = []
     for img_data in impressions_list:
         show_propose_left = img_data['show_propose_left']
+        is_dummy = img_data.get('is_dummy', False)
         
         expanded_images.append({
             'id': img_data['id'],
@@ -675,7 +666,8 @@ def output():
             'left_prediction': img_data['prediction_propose'] if show_propose_left else img_data['prediction_compare'],
             'right_prediction': img_data['prediction_compare'] if show_propose_left else img_data['prediction_propose'],
             'left_method': 'propose' if show_propose_left else 'compare',
-            'right_method': 'compare' if show_propose_left else 'propose'
+            'right_method': 'compare' if show_propose_left else 'propose',
+            'is_dummy': is_dummy  # ダミーフラグを追加
         })
     
     logger.info(f"Loaded {len(expanded_images)} impressions from memory cache")
@@ -683,6 +675,10 @@ def output():
     if request.method == 'POST':
         scores_left = {}
         scores_right = {}
+        
+        # ダミー画像のバリデーション用変数
+        dummy_validation_failed = False
+        dummy_error_message = ''
         
         for img in expanded_images:
             img_id = img['id']
@@ -695,13 +691,39 @@ def output():
             try:
                 scores_left[img_id] = int(score_left)
                 scores_right[img_id] = int(score_right)
+                
+                # ダミー画像のチェック
+                if img.get('is_dummy', False):
+                    if scores_left[img_id] != 1:
+                        dummy_validation_failed = True
+                        dummy_error_message = f'注意喚起項目の左側（予測A）で指示された値（1）が入力されていません。入力された値: {scores_left[img_id]}'
+                        logger.warning(f"Dummy validation failed for {account_name}: Left score = {scores_left[img_id]} (expected 1)")
+                    if scores_right[img_id] != 3:
+                        dummy_validation_failed = True
+                        dummy_error_message = f'注意喚起項目の右側（予測B）で指示された値（3）が入力されていません。入力された値: {scores_right[img_id]}'
+                        logger.warning(f"Dummy validation failed for {account_name}: Right score = {scores_right[img_id]} (expected 3)")
+                    
+                    if dummy_validation_failed:
+                        break
+                        
             except ValueError:
                 return render_template('output.html', evaluation_images=expanded_images, 
                                      error='無効な評価値です'), 400
         
+        # ダミーバリデーション失敗時の処理
+        if dummy_validation_failed:
+            logger.error(f"Validation check failed for account: {account_name}")
+            return render_template('output.html', evaluation_images=expanded_images, 
+                                 error=f'【評価の信頼性チェック失敗】{dummy_error_message} 指示に従って正確に入力してください。'), 400
+        
         results = []
         for img in expanded_images:
             img_id = img['id']
+            
+            # ダミー画像は結果に含めない
+            if img.get('is_dummy', False):
+                logger.info(f"Dummy validation passed for {account_name}")
+                continue
             
             # 提案手法と比較手法のスコアを正しく振り分ける
             if img['left_method'] == 'propose':
@@ -724,6 +746,7 @@ def output():
         n8n_data = {
             'account_name': account_name,
             'timestamp': datetime.now().isoformat(),
+            'validation_passed': True,  # バリデーション成功フラグ
             'results': results
         }
         send_to_n8n(N8N_WEBHOOK_RESULT, n8n_data)
