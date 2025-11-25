@@ -173,7 +173,11 @@ def extract_features_from_images(images_paths):
         Extracted features as string (bullet points)
     """
     
-    system_prompt = """これらの服の特徴を箇条書きで10個書いてください。出力は箇条書きで、markdown形式の記述を避けてください。"""
+    system_prompt = """これらの服の特徴を箇条書きで10個書いてください。出力は箇条書きで、markdown形式の記述を避けてください。
+    出力形式:
+・〜〜〜
+・〜〜〜
+・〜〜〜"""
     
     # Build image content for API
     image_content = []
@@ -380,8 +384,6 @@ def predict_impression(account_name, like_criteria, dislike_criteria, like_featu
         'has_error': has_error
     }
     
-    send_to_n8n(N8N_WEBHOOK_IMPRESSION, impression_data)
-    
     if prediction_propose and prediction_compare and not has_error:
         logger.info(f"Successfully predicted impressions for {image_name}, ID: {impression_id}")
     
@@ -389,8 +391,10 @@ def predict_impression(account_name, like_criteria, dislike_criteria, like_featu
     return {
         'impression_id': impression_id,
         'image_name': image_name,
+        'account_name': account_name,
         'prediction_propose': prediction_propose,
         'prediction_compare': prediction_compare,
+        'timestamp': datetime.now().isoformat(),
         'has_error': has_error
     }
 
@@ -535,6 +539,7 @@ def second():
             
             # メモリ上に印象文を保持する配列
             impressions_list = []
+            impressions_for_save = []
             test_data_dir = 'test_data'
             
             # test_dataディレクトリの存在確認
@@ -572,6 +577,15 @@ def second():
                                 'show_propose_left': show_propose_left,
                                 'has_error': impression_data['has_error']
                             })
+                            impressions_for_save.append({
+                                'image_name': impression_data['image_name'],
+                                'account_name': impression_data['account_name'],
+                                'impression_id': impression_data['impression_id'],
+                                'prediction_propose': impression_data['prediction_propose'],
+                                'prediction_compare': impression_data['prediction_compare'],
+                                'has_error': impression_data['has_error']
+                            })
+                            
                             logger.info(f"Successfully processed {img_file}")
                         
                         # 各画像処理の後に待機時間を追加（レート制限回避）
@@ -591,7 +605,7 @@ def second():
                         })
                 else:
                     logger.warning(f"Image not found: {img_path}")
-            
+            send_to_n8n(N8N_WEBHOOK_IMPRESSION, {"data": impressions_for_save})
             logger.info(f"Total evaluation images prepared: {len(impressions_list)}")
             
             if len(impressions_list) == 0:
@@ -603,15 +617,17 @@ def second():
             dummy_item = {
                 'id': 'test22',
                 'filename': 'virus.png',
-                'impression_id': 'dummy_check',
+                'impression_id': 'test22',
                 'prediction_propose': 'ここでは１と入力してください。',
                 'prediction_compare': 'ここでは５を入力してください',
                 'show_propose_left': True,
                 'has_error': False,
                 'is_dummy': True
             }
-            # 10番目と11番目の間に挿入（インデックス10）
-            impressions_list.insert(10, dummy_item)
+            impressions_list.append(dummy_item)
+            
+            # リストをシャッフルしてダミー項目の位置をランダムにする
+            random.shuffle(impressions_list)
             
             # メモリ上のキャッシュに保存（session['sid']をキーとする）
             cache_key = session.get('cache_key')
@@ -668,7 +684,6 @@ def output():
     expanded_images = []
     for img_data in impressions_list:
         show_propose_left = img_data['show_propose_left']
-        is_dummy = img_data.get('is_dummy', False)
         
         expanded_images.append({
             'id': img_data['id'],
@@ -681,7 +696,7 @@ def output():
             'right_prediction': img_data['prediction_compare'] if show_propose_left else img_data['prediction_propose'],
             'left_method': 'propose' if show_propose_left else 'compare',
             'right_method': 'compare' if show_propose_left else 'propose',
-            'is_dummy': is_dummy  # ダミーフラグを追加
+            'is_dummy': img_data.get('is_dummy', False)  # ダミーフラグを追加
         })
     
     logger.info(f"Loaded {len(expanded_images)} impressions from memory cache")
@@ -705,39 +720,13 @@ def output():
             try:
                 scores_left[img_id] = int(score_left)
                 scores_right[img_id] = int(score_right)
-                
-                # ダミー画像のチェック
-                if img.get('is_dummy', False):
-                    if scores_left[img_id] != 1:
-                        dummy_validation_failed = True
-                        dummy_error_message = f'注意喚起項目の左側（予測A）で指示された値（1）が入力されていません。入力された値: {scores_left[img_id]}'
-                        logger.warning(f"Dummy validation failed for {account_name}: Left score = {scores_left[img_id]} (expected 1)")
-                    if scores_right[img_id] != 5:
-                        dummy_validation_failed = True
-                        dummy_error_message = f'注意喚起項目の右側（予測B）で指示された値（5）が入力されていません。入力された値: {scores_right[img_id]}'
-                        logger.warning(f"Dummy validation failed for {account_name}: Right score = {scores_right[img_id]} (expected 5)")
-                    
-                    if dummy_validation_failed:
-                        break
-                        
             except ValueError:
                 return render_template('output.html', evaluation_images=expanded_images, 
                                      error='無効な評価値です'), 400
         
-        # ダミーバリデーション失敗時の処理
-        if dummy_validation_failed:
-            logger.error(f"Validation check failed for account: {account_name}")
-            return render_template('output.html', evaluation_images=expanded_images, 
-                                 error=f'【評価の信頼性チェック失敗】{dummy_error_message} 指示に従って正確に入力してください。'), 400
-        
         results = []
         for img in expanded_images:
             img_id = img['id']
-            
-            # ダミー画像は結果に含めない
-            if img.get('is_dummy', False):
-                logger.info(f"Dummy validation passed for {account_name}")
-                continue
             
             # 提案手法と比較手法のスコアを正しく振り分ける
             if img['left_method'] == 'propose':
@@ -760,7 +749,6 @@ def output():
         n8n_data = {
             'account_name': account_name,
             'timestamp': datetime.now().isoformat(),
-            'validation_passed': True,  # バリデーション成功フラグ
             'results': results
         }
         send_to_n8n(N8N_WEBHOOK_RESULT, n8n_data)
@@ -818,61 +806,3 @@ def internal_error(error):
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-# ============================================================================
-# Webhook Pseudo Data (Example)
-# ============================================================================
-
-# N8N_WEBHOOK_LIKE
-# {
-#     "account_name": "test_user",
-#     "timestamp": "2023-10-27T10:00:00.000000",
-#     "like_criteria": "・シンプルで洗練されたデザイン\n・落ち着いた色合い\n・着心地が良さそうな素材",
-#     "like_features": "・無地\n・コットン素材\n・ネイビーカラー"
-# }
-
-# N8N_WEBHOOK_DISLIKE
-# {
-#     "account_name": "test_user",
-#     "timestamp": "2023-10-27T10:05:00.000000",
-#     "dislike_criteria": "・派手すぎる柄\n・奇抜なシルエット\n・安っぽい素材感",
-#     "dislike_features": "・レオパード柄\n・蛍光色\n・ポリエステル素材"
-# }
-
-# N8N_WEBHOOK_IMPRESSION
-# {
-#     "impression_id": "uuid-1234-5678",
-#     "account_name": "test_user",
-#     "image_name": "test1.jpg",
-#     "prediction_propose": "この服はシンプルで落ち着いた色合いなので、とても気に入ると思います。",
-#     "prediction_compare": "この服は無地でネイビーカラーなので、好みに合うでしょう。",
-#     "timestamp": "2023-10-27T10:10:00.000000",
-#     "has_error": false
-# }
-
-# N8N_WEBHOOK_RESULT
-# {
-#     "account_name": "test_user",
-#     "timestamp": "2023-10-27T10:15:00.000000",
-#     "validation_passed": true,
-#     "results": [
-#         {
-#             "image_id": "test1",
-#             "impression_id": "uuid-1234-5678",
-#             "prediction_propose": "この服はシンプルで落ち着いた色合いなので、とても気に入ると思います。",
-#             "prediction_compare": "この服は無地でネイビーカラーなので、好みに合うでしょう。",
-#             "score_propose": 5,
-#             "score_compare": 3,
-#             "display_order": "propose_left"
-#         },
-#         {
-#             "image_id": "test2",
-#             "impression_id": "uuid-8765-4321",
-#             "prediction_propose": "少し派手ですが、素材が良いので許容範囲かもしれません。",
-#             "prediction_compare": "蛍光色はあまり好みではないでしょう。",
-#             "score_propose": 2,
-#             "score_compare": 4,
-#             "display_order": "compare_left"
-#         }
-#     ]
-# }
