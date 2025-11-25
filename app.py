@@ -601,7 +601,7 @@ def second():
             
             # ダミー項目を追加（注意喚起用）
             dummy_item = {
-                'id': 'dummy_check',
+                'id': 'test22',
                 'filename': 'virus.png',
                 'impression_id': 'dummy_check',
                 'prediction_propose': 'ここでは１と入力してください。',
@@ -610,10 +610,8 @@ def second():
                 'has_error': False,
                 'is_dummy': True
             }
-            impressions_list.append(dummy_item)
-            
-            # リストをシャッフルしてダミー項目の位置をランダムにする
-            random.shuffle(impressions_list)
+            # 10番目と11番目の間に挿入（インデックス10）
+            impressions_list.insert(10, dummy_item)
             
             # メモリ上のキャッシュに保存（session['sid']をキーとする）
             cache_key = session.get('cache_key')
@@ -820,3 +818,61 @@ def internal_error(error):
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+# ============================================================================
+# Webhook Pseudo Data (Example)
+# ============================================================================
+
+# N8N_WEBHOOK_LIKE
+# {
+#     "account_name": "test_user",
+#     "timestamp": "2023-10-27T10:00:00.000000",
+#     "like_criteria": "・シンプルで洗練されたデザイン\n・落ち着いた色合い\n・着心地が良さそうな素材",
+#     "like_features": "・無地\n・コットン素材\n・ネイビーカラー"
+# }
+
+# N8N_WEBHOOK_DISLIKE
+# {
+#     "account_name": "test_user",
+#     "timestamp": "2023-10-27T10:05:00.000000",
+#     "dislike_criteria": "・派手すぎる柄\n・奇抜なシルエット\n・安っぽい素材感",
+#     "dislike_features": "・レオパード柄\n・蛍光色\n・ポリエステル素材"
+# }
+
+# N8N_WEBHOOK_IMPRESSION
+# {
+#     "impression_id": "uuid-1234-5678",
+#     "account_name": "test_user",
+#     "image_name": "test1.jpg",
+#     "prediction_propose": "この服はシンプルで落ち着いた色合いなので、とても気に入ると思います。",
+#     "prediction_compare": "この服は無地でネイビーカラーなので、好みに合うでしょう。",
+#     "timestamp": "2023-10-27T10:10:00.000000",
+#     "has_error": false
+# }
+
+# N8N_WEBHOOK_RESULT
+# {
+#     "account_name": "test_user",
+#     "timestamp": "2023-10-27T10:15:00.000000",
+#     "validation_passed": true,
+#     "results": [
+#         {
+#             "image_id": "test1",
+#             "impression_id": "uuid-1234-5678",
+#             "prediction_propose": "この服はシンプルで落ち着いた色合いなので、とても気に入ると思います。",
+#             "prediction_compare": "この服は無地でネイビーカラーなので、好みに合うでしょう。",
+#             "score_propose": 5,
+#             "score_compare": 3,
+#             "display_order": "propose_left"
+#         },
+#         {
+#             "image_id": "test2",
+#             "impression_id": "uuid-8765-4321",
+#             "prediction_propose": "少し派手ですが、素材が良いので許容範囲かもしれません。",
+#             "prediction_compare": "蛍光色はあまり好みではないでしょう。",
+#             "score_propose": 2,
+#             "score_compare": 4,
+#             "display_order": "compare_left"
+#         }
+#     ]
+# }
