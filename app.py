@@ -599,6 +599,22 @@ def second():
                 return render_template('second.html', account_name=account_name, 
                                      error='評価用画像の処理に失敗しました'), 500
             
+            # ダミー項目を追加（注意喚起用）
+            dummy_item = {
+                'id': 'dummy_check',
+                'filename': 'virus.png',
+                'impression_id': 'dummy_check',
+                'prediction_propose': 'ここでは１と入力してください。',
+                'prediction_compare': 'ここでは５を入力してください',
+                'show_propose_left': True,
+                'has_error': False,
+                'is_dummy': True
+            }
+            impressions_list.append(dummy_item)
+            
+            # リストをシャッフルしてダミー項目の位置をランダムにする
+            random.shuffle(impressions_list)
+            
             # メモリ上のキャッシュに保存（session['sid']をキーとする）
             cache_key = session.get('cache_key')
             if not cache_key:
@@ -698,10 +714,10 @@ def output():
                         dummy_validation_failed = True
                         dummy_error_message = f'注意喚起項目の左側（予測A）で指示された値（1）が入力されていません。入力された値: {scores_left[img_id]}'
                         logger.warning(f"Dummy validation failed for {account_name}: Left score = {scores_left[img_id]} (expected 1)")
-                    if scores_right[img_id] != 3:
+                    if scores_right[img_id] != 5:
                         dummy_validation_failed = True
-                        dummy_error_message = f'注意喚起項目の右側（予測B）で指示された値（3）が入力されていません。入力された値: {scores_right[img_id]}'
-                        logger.warning(f"Dummy validation failed for {account_name}: Right score = {scores_right[img_id]} (expected 3)")
+                        dummy_error_message = f'注意喚起項目の右側（予測B）で指示された値（5）が入力されていません。入力された値: {scores_right[img_id]}'
+                        logger.warning(f"Dummy validation failed for {account_name}: Right score = {scores_right[img_id]} (expected 5)")
                     
                     if dummy_validation_failed:
                         break
