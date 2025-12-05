@@ -720,9 +720,29 @@ def output():
             try:
                 scores_left[img_id] = int(score_left)
                 scores_right[img_id] = int(score_right)
+                
+                # ダミー画像のチェック
+                if img.get('is_dummy', False):
+                    if scores_left[img_id] != 1:
+                        dummy_validation_failed = True
+                        dummy_error_message = f'注意喚起項目の左側（予測A）で指示された値（1）が入力されていません。入力された値: {scores_left[img_id]}'
+                        logger.warning(f"Dummy validation failed for {account_name}: Left score = {scores_left[img_id]} (expected 1)")
+                    if scores_right[img_id] != 5:
+                        dummy_validation_failed = True
+                        dummy_error_message = f'注意喚起項目の右側（予測B）で指示された値（5）が入力されていません。入力された値: {scores_right[img_id]}'
+                        logger.warning(f"Dummy validation failed for {account_name}: Right score = {scores_right[img_id]} (expected 5)")
+                    
+                    if dummy_validation_failed:
+                        break
             except ValueError:
                 return render_template('output.html', evaluation_images=expanded_images, 
                                      error='無効な評価値です'), 400
+        
+        # ダミーバリデーション失敗時の処理
+        if dummy_validation_failed:
+            logger.error(f"Validation check failed for account: {account_name}")
+            return render_template('output.html', evaluation_images=expanded_images, 
+                                 error=f'【評価の信頼性チェック失敗】{dummy_error_message} 指示に従って正確に入力してください。'), 400
         
         results = []
         for img in expanded_images:
@@ -749,6 +769,7 @@ def output():
         n8n_data = {
             'account_name': account_name,
             'timestamp': datetime.now().isoformat(),
+            'validation_passed': True,
             'results': results
         }
         send_to_n8n(N8N_WEBHOOK_RESULT, n8n_data)
