@@ -83,7 +83,23 @@
         const fileList = document.getElementById('file-list');
         const fileInputWrapper = document.querySelector('.file-input-wrapper');
 
-        fileInput.addEventListener('change', updateFileList);
+        // Store accumulated files
+        const dataTransfer = new DataTransfer();
+
+        fileInput.addEventListener('change', (e) => {
+            const newFiles = Array.from(e.target.files);
+            newFiles.forEach(file => {
+                // Prevent duplicates based on name and size
+                const exists = Array.from(dataTransfer.files).some(f =>
+                    f.name === file.name && f.size === file.size
+                );
+                if (!exists) {
+                    dataTransfer.items.add(file);
+                }
+            });
+            fileInput.files = dataTransfer.files;
+            updateFileList();
+        });
 
         // Drag and drop
         fileInputWrapper.addEventListener('dragover', (e) => {
@@ -98,9 +114,38 @@
         fileInputWrapper.addEventListener('drop', (e) => {
             e.preventDefault();
             fileInputWrapper.classList.remove('dragover');
-            fileInput.files = e.dataTransfer.files;
+
+            const newFiles = Array.from(e.dataTransfer.files);
+            newFiles.forEach(file => {
+                // Prevent duplicates
+                const exists = Array.from(dataTransfer.files).some(f =>
+                    f.name === file.name && f.size === file.size
+                );
+                if (!exists) {
+                    dataTransfer.items.add(file);
+                }
+            });
+            fileInput.files = dataTransfer.files;
             updateFileList();
         });
+
+        function removeFile(index) {
+            const newDataTransfer = new DataTransfer();
+            Array.from(dataTransfer.files).forEach((file, i) => {
+                if (i !== index) {
+                    newDataTransfer.items.add(file);
+                }
+            });
+
+            // Update the main dataTransfer object
+            dataTransfer.items.clear();
+            Array.from(newDataTransfer.files).forEach(file => {
+                dataTransfer.items.add(file);
+            });
+
+            fileInput.files = dataTransfer.files;
+            updateFileList();
+        }
 
         function updateFileList() {
             const files = Array.from(fileInput.files);
@@ -113,7 +158,19 @@
             const ul = document.createElement('ul');
             files.forEach((file, index) => {
                 const li = document.createElement('li');
-                li.textContent = `${index + 1}. ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+                li.className = 'file-item';
+
+                const span = document.createElement('span');
+                span.textContent = `${index + 1}. ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
+                li.appendChild(span);
+
+                const removeBtn = document.createElement('button');
+                removeBtn.textContent = '削除';
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn-remove';
+                removeBtn.onclick = () => removeFile(index);
+                li.appendChild(removeBtn);
+
                 ul.appendChild(li);
             });
 
@@ -126,7 +183,7 @@
                 fileList.appendChild(warning);
             } else if (files.length > 5) {
                 const info = document.createElement('p');
-                warning.className = 'info-text';
+                info.className = 'info-text';
                 info.textContent = `最初の5枚が使用されます`;
                 fileList.appendChild(info);
             } else {
